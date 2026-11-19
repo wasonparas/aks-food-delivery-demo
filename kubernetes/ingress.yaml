@@ -1,0 +1,31 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: food-demo
+  namespace: food-demo
+spec:
+  ingressClassName: nginx
+  rules:
+    - http:
+        paths:
+          - path: /restaurants
+            pathType: Prefix
+            backend:
+              service:
+                name: restaurant-service
+                port:
+                  number: 8080
+          - path: /orders
+            pathType: Prefix
+            backend:
+              service:
+                name: order-service
+                port:
+                  number: 8081
+          - path: /payments
+            pathType: Prefix
+            backend:
+              service:
+                name: payment-service
+                port:
+                  number: 8082
