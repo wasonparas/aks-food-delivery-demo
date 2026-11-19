@@ -12,15 +12,15 @@ It is intended for technical knowledge-sharing sessions and demonstrations of Ku
 
 The Food Delivery application consists of three independent microservices:
 
-| Microservice | Port | Responsibility |
-|---|---:|---|
-| Restaurant Service | 8080 | Provides restaurant information |
-| Order Service | 8081 | Creates and manages customer orders |
-| Payment Service | 8082 | Processes simulated payments |
+| **Microservice**   | **Port** | **Responsibility**                  |
+| ------------------ | -------- | ----------------------------------- |
+| Restaurant Service | 8080     | Provides restaurant information     |
+| Order Service      | 8081     | Creates and manages customer orders |
+| Payment Service    | 8082     | Processes simulated payments        |
 
 ### Application Architecture
 
-```text
+```
                          Customer
                             |
                             |
@@ -48,6 +48,7 @@ The Food Delivery application consists of three independent microservices:
                                        |
                                        v
                                Payment Approved
+
 ```
 
 ### Request Flow
@@ -77,7 +78,7 @@ When a customer creates an order:
 
 ## 2. Project Structure
 
-```text
+```
 aks-food-delivery-demo/
 │
 ├── restaurant-service/
@@ -108,6 +109,7 @@ aks-food-delivery-demo/
 │   └── deploy.sh
 │
 └── README.md
+
 ```
 
 ---
@@ -116,15 +118,16 @@ aks-food-delivery-demo/
 
 Before starting, ensure the following tools are available:
 
-| Tool | Purpose |
-|---|---|
-| Azure CLI | Manage Azure resources |
-| kubectl | Manage Kubernetes resources |
-| Docker | Build container images |
-| Helm | Install NGINX Ingress |
-| Git | Clone and manage source code |
+| **Tool**  | **Purpose**                  |
+| --------- | ---------------------------- |
+| Azure CLI | Manage Azure resources       |
+| kubectl   | Manage Kubernetes resources  |
+| Docker    | Build container images       |
+| Helm      | Install NGINX Ingress        |
+| Git       | Clone and manage source code |
 
 You also need:
+
 - An active Azure subscription.
 - Permission to create Azure resources.
 - Permission to create an AKS cluster and Azure Container Registry.
@@ -132,7 +135,7 @@ You also need:
 
 Check installed tools:
 
-```bash
+```
 az version
 kubectl version --client
 docker --version
@@ -146,19 +149,19 @@ git --version
 
 Clone the project:
 
-```bash
+```
 git clone <YOUR-GIT-REPOSITORY-URL>
 ```
 
 Navigate to the project directory:
 
-```bash
+```
 cd aks-food-delivery-demo
 ```
 
 Check the project structure:
 
-```bash
+```
 ls -la
 ```
 
@@ -168,7 +171,7 @@ ls -la
 
 ### Step 1: Configure Environment Variables
 
-```bash
+```
 export LOCATION=australiaeast
 export RESOURCE_GROUP=rg-aks-food-demo
 export AKS_NAME=aks-food-demo
@@ -179,25 +182,25 @@ The ACR name must be globally unique and contain only supported characters.
 
 ### Step 2: Log in to Azure
 
-```bash
+```
 az login
 ```
 
 Check the active subscription:
 
-```bash
+```
 az account show
 ```
 
 If required, select the correct subscription:
 
-```bash
+```
 az account set --subscription "<SUBSCRIPTION-ID>"
 ```
 
 ### Step 3: Create the Resource Group
 
-```bash
+```
 az group create \
   --name $RESOURCE_GROUP \
   --location $LOCATION
@@ -207,7 +210,7 @@ If your organisation has Azure Policy requirements, include the mandatory resour
 
 ### Step 4: Create Azure Container Registry
 
-```bash
+```
 az acr create \
   --resource-group $RESOURCE_GROUP \
   --name $ACR_NAME \
@@ -219,7 +222,7 @@ az acr create \
 
 Create an AKS cluster with two worker nodes:
 
-```bash
+```
 az aks create \
   --resource-group $RESOURCE_GROUP \
   --name $AKS_NAME \
@@ -233,7 +236,7 @@ The `--attach-acr` option grants AKS permission to pull images from the Azure Co
 
 ### Step 6: Connect to AKS
 
-```bash
+```
 az aks get-credentials \
   --resource-group $RESOURCE_GROUP \
   --name $AKS_NAME
@@ -241,7 +244,7 @@ az aks get-credentials \
 
 Verify the cluster connection:
 
-```bash
+```
 kubectl get nodes
 ```
 
@@ -253,15 +256,15 @@ Expected: Two worker nodes should be listed as Ready.
 
 The application consists of three Docker images:
 
-| Service | Image |
-|---|---|
-| Restaurant | food-restaurant:v1 |
-| Order | food-order:v1 |
-| Payment | food-payment:v1 |
+| **Service** | **Image**          |
+| ----------- | ------------------ |
+| Restaurant  | food-restaurant:v1 |
+| Order       | food-order:v1      |
+| Payment     | food-payment:v1    |
 
 ### Step 1: Log in to ACR
 
-```bash
+```
 az acr login --name $ACR_NAME
 ```
 
@@ -269,7 +272,7 @@ az acr login --name $ACR_NAME
 
 From the project root:
 
-```bash
+```
 chmod +x scripts/build-and-push.sh
 ./scripts/build-and-push.sh
 ```
@@ -278,7 +281,7 @@ The script should build and push all three images to ACR.
 
 ### Step 3: Verify Images in ACR
 
-```bash
+```
 az acr repository list \
   --name $ACR_NAME \
   --output table
@@ -286,7 +289,7 @@ az acr repository list \
 
 Check image tags:
 
-```bash
+```
 az acr repository show-tags \
   --name $ACR_NAME \
   --repository food-restaurant \
@@ -305,10 +308,11 @@ az acr repository show-tags \
 
 Expected image references:
 
-```text
+```
 <ACR_NAME>.azurecr.io/food-restaurant:v1
 <ACR_NAME>.azurecr.io/food-order:v1
 <ACR_NAME>.azurecr.io/food-payment:v1
+
 ```
 
 ---
@@ -319,7 +323,7 @@ NGINX Ingress provides a single entry point to access the application from outsi
 
 ### Step 1: Add the Helm Repository
 
-```bash
+```
 helm repo add ingress-nginx \
   https://kubernetes.github.io/ingress-nginx
 
@@ -328,30 +332,28 @@ helm repo update
 
 ### Step 2: Install NGINX Ingress
 
-```bash
+```
 helm install ingress-nginx ingress-nginx/ingress-nginx \
   --namespace ingress-nginx \
   --create-namespace
 ```
 
-```bash
+```
 kubectl annotate service ingress-nginx-controller \
   -n ingress-nginx \
   service.beta.kubernetes.io/azure-load-balancer-health-probe-request-path=/healthz \
   --overwrite
 ```
 
-
-
 ### Step 3: Verify the Installation
 
-```bash
+```
 kubectl get pods -n ingress-nginx
 ```
 
 Check the Service:
 
-```bash
+```
 kubectl get svc -n ingress-nginx
 ```
 
@@ -359,14 +361,14 @@ The `ingress-nginx-controller` Service should be created with type `LoadBalancer
 
 ### Step 4: Retrieve the Public IP
 
-```bash
+```
 kubectl get svc ingress-nginx-controller \
   -n ingress-nginx
 ```
 
 Retrieve the IP automatically:
 
-```bash
+```
 export INGRESS_IP=$(kubectl get svc ingress-nginx-controller \
   -n ingress-nginx \
   -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
@@ -384,7 +386,7 @@ Configure the secret using the value expected by the application.
 
 Edit:
 
-```bash
+```
 vi kubernetes/secrets.yaml
 ```
 
@@ -398,25 +400,25 @@ Ensure the Secret contains the expected key and value.
 
 ### Step 1: Deploy the Namespace
 
-```bash
+```
 kubectl apply -f kubernetes/namespace.yaml
 ```
 
 Verify:
 
-```bash
+```
 kubectl get namespaces
 ```
 
 ### Step 2: Deploy the Secrets
 
-```bash
+```
 kubectl apply -f kubernetes/secrets.yaml
 ```
 
 ### Step 3: Deploy the Microservices
 
-```bash
+```
 kubectl apply -f kubernetes/restaurant.yaml
 kubectl apply -f kubernetes/payment.yaml
 kubectl apply -f kubernetes/order.yaml
@@ -424,13 +426,13 @@ kubectl apply -f kubernetes/order.yaml
 
 ### Step 4: Deploy the Ingress
 
-```bash
+```
 kubectl apply -f kubernetes/ingress.yaml
 ```
 
 ### Step 5: Verify Deployments
 
-```bash
+```
 kubectl get deployments -n food-demo
 kubectl get pods -n food-demo -o wide
 kubectl get services -n food-demo
@@ -439,10 +441,11 @@ kubectl get ingress -n food-demo
 
 Expected application deployments:
 
-```text
+```
 order-service
 payment-service
 restaurant-service
+
 ```
 
 All deployments should become Available, and the application pods should be Running and Ready.
@@ -462,7 +465,7 @@ Testing is divided into two areas:
 
 Create a temporary pod to run curl commands inside the cluster:
 
-```bash
+```
 kubectl run debug-curl \
   -n food-demo \
   --image=curlimages/curl \
@@ -472,14 +475,14 @@ kubectl run debug-curl \
 
 Wait for the pod:
 
-```bash
+```
 kubectl wait --for=condition=Ready pod/debug-curl \
   -n food-demo --timeout=120s
 ```
 
 Verify:
 
-```bash
+```
 kubectl get pod debug-curl -n food-demo
 ```
 
@@ -487,52 +490,108 @@ kubectl get pod debug-curl -n food-demo
 
 Test the Restaurant Service health endpoint:
 
-```bash
+```
 kubectl exec -n food-demo debug-curl -- \
   curl -i http://restaurant-service:8080/health
 ```
 
 Test the restaurant listing endpoint:
 
-```bash
+```
 kubectl exec -n food-demo debug-curl -- \
   curl -i http://restaurant-service:8080/restaurants
 ```
 
 Test a specific restaurant:
 
-```bash
+```
 kubectl exec -n food-demo debug-curl -- \
   curl -i http://restaurant-service:8080/restaurants/rest-001
 ```
 
 Expected:
+
 - HTTP 200 response.
 - Restaurant details should be returned.
 
 ### Test 2: Payment Service
 
-Test the Payment Service health endpoint:
+The Payment Service processes simulated payments. It requires a valid API key and validates the payment request before approving it.
+
+The application reads the API key from the `PAYMENT_API_KEY` environment variable. In Kubernetes, this value is supplied by the Secret named `food-demo-secrets`.
+
+The Payment Service is exposed internally as a `ClusterIP` Service on port `8082`. It is not publicly exposed by the current Ingress configuration.
+
+#### 2.1 Test the service root endpoint
+
+```bash
+kubectl exec -n food-demo debug-curl -- \
+  curl -i http://payment-service:8082/
+```
+
+Expected: HTTP `200 OK`, with the service name, a message that payments are simulated, and the available endpoint list.
+
+#### 2.2 Test the health endpoint
 
 ```bash
 kubectl exec -n food-demo debug-curl -- \
   curl -i http://payment-service:8082/health
 ```
 
-Test the readiness endpoint:
+Expected: HTTP `200 OK`, with `status` set to `healthy`.
+
+#### 2.3 Test the readiness endpoint
 
 ```bash
 kubectl exec -n food-demo debug-curl -- \
   curl -i http://payment-service:8082/ready
 ```
 
-Test a simulated payment:
+Expected: HTTP `200 OK`, with `status` set to `ready`.
+
+**Kubernetes probe note:** The current `payment.yaml` uses `/health` for both the readiness and liveness probes. The application also implements `/ready`, so you can optionally change the readiness probe to `/ready` while keeping the liveness probe on `/health`.
+
+#### 2.4 Check the API key Secret configuration
+
+Confirm that the Secret exists:
+
+```bash
+kubectl get secret food-demo-secrets -n food-demo
+```
+
+The Secret must provide an environment variable named `PAYMENT_API_KEY`. The deployment imports Secret keys using `envFrom`, so the key name in the Secret must match the environment variable name exactly.
+
+To inspect only the key names (not their values):
+
+```bash
+kubectl get secret food-demo-secrets -n food-demo \
+  -o json | python3 -c \
+  'import json,sys; print("\n".join(json.load(sys.stdin).get("data", {}).keys()))'
+```
+
+Expected: `PAYMENT_API_KEY` should appear in the output.
+
+Do not print or commit the actual API key. If the Secret is missing the key, update your secret configuration securely and re-apply it.
+
+#### 2.5 Set the API key in the Cloud Shell session
+
+Read the same key value that is configured in the Kubernetes Secret. Do not paste the actual key into the README or Git repository.
+
+```bash
+read -rsp "Enter Payment API key: " PAYMENT_API_KEY
+export PAYMENT_API_KEY
+echo
+```
+
+This exports the key in the current Cloud Shell session. The value is not automatically available inside the debug pod; the following commands pass it as a curl header from the shell running `kubectl exec`.
+
+#### 2.6 Test a successful simulated payment
 
 ```bash
 kubectl exec -n food-demo debug-curl -- \
   curl -i -X POST http://payment-service:8082/payments/charge \
   -H "Content-Type: application/json" \
-  -H "X-Demo-Key: YOUR_DEMO_API_KEY" \
+  -H "X-Demo-Key: ${PAYMENT_API_KEY}" \
   -d '{
     "order_id": "ord-test-001",
     "amount": 25.50,
@@ -540,32 +599,213 @@ kubectl exec -n food-demo debug-curl -- \
   }'
 ```
 
-Replace `YOUR_DEMO_API_KEY` with the value configured in your Kubernetes Secret.
+Expected: HTTP `201 CREATED`.
+
+Example response (the payment ID is generated dynamically):
+
+```json
+{
+  "payment_id": "pay-example",
+  "order_id": "ord-test-001",
+  "amount": 25.5,
+  "currency": "NZD",
+  "status": "APPROVED",
+  "simulated": true
+}
+```
+
+The response confirms that the request was authenticated and accepted as a simulated payment.
+
+#### 2.7 Test authentication with a missing API key
+
+Send a payment request without the `X-Demo-Key` header:
+
+```bash
+kubectl exec -n food-demo debug-curl -- \
+  curl -i -X POST http://payment-service:8082/payments/charge \
+  -H "Content-Type: application/json" \
+  -d '{
+    "order_id": "ord-test-002",
+    "amount": 25.50,
+    "currency": "NZD"
+  }'
+```
+
+Expected: HTTP `401 UNAUTHORIZED`.
+
+#### 2.8 Test authentication with an incorrect API key
+
+```bash
+kubectl exec -n food-demo debug-curl -- \
+  curl -i -X POST http://payment-service:8082/payments/charge \
+  -H "Content-Type: application/json" \
+  -H "X-Demo-Key: invalid-demo-key" \
+  -d '{
+    "order_id": "ord-test-003",
+    "amount": 25.50,
+    "currency": "NZD"
+  }'
+```
+
+Expected: HTTP `401 UNAUTHORIZED`.
+
+#### 2.9 Test a negative payment amount
+
+```bash
+kubectl exec -n food-demo debug-curl -- \
+  curl -i -X POST http://payment-service:8082/payments/charge \
+  -H "Content-Type: application/json" \
+  -H "X-Demo-Key: ${PAYMENT_API_KEY}" \
+  -d '{
+    "order_id": "ord-test-004",
+    "amount": -25.50,
+    "currency": "NZD"
+  }'
+```
+
+Expected: HTTP `400 BAD REQUEST`.
+
+#### 2.10 Test a missing order ID
+
+```bash
+kubectl exec -n food-demo debug-curl -- \
+  curl -i -X POST http://payment-service:8082/payments/charge \
+  -H "Content-Type: application/json" \
+  -H "X-Demo-Key: ${PAYMENT_API_KEY}" \
+  -d '{
+    "amount": 25.50,
+    "currency": "NZD"
+  }'
+```
+
+Expected: HTTP `400 BAD REQUEST`.
+
+#### 2.11 Test an invalid currency
+
+The application expects a three-letter alphabetic currency code.
+
+```bash
+kubectl exec -n food-demo debug-curl -- \
+  curl -i -X POST http://payment-service:8082/payments/charge \
+  -H "Content-Type: application/json" \
+  -H "X-Demo-Key: ${PAYMENT_API_KEY}" \
+  -d '{
+    "order_id": "ord-test-005",
+    "amount": 25.50,
+    "currency": "US"
+  }'
+```
+
+Expected: HTTP `400 BAD REQUEST`.
+
+#### 2.12 Test invalid JSON
+
+```bash
+kubectl exec -n food-demo debug-curl -- \
+  curl -i -X POST http://payment-service:8082/payments/charge \
+  -H "Content-Type: application/json" \
+  -H "X-Demo-Key: ${PAYMENT_API_KEY}" \
+  -d 'invalid-json'
+```
+
+Expected: HTTP `400 BAD REQUEST`.
+
+#### 2.13 Test a missing or invalid amount
+
+Missing amount:
+
+```bash
+kubectl exec -n food-demo debug-curl -- \
+  curl -i -X POST http://payment-service:8082/payments/charge \
+  -H "Content-Type: application/json" \
+  -H "X-Demo-Key: ${PAYMENT_API_KEY}" \
+  -d '{
+    "order_id": "ord-test-006",
+    "currency": "NZD"
+  }'
+```
+
+Expected: HTTP `400 BAD REQUEST`.
+
+Zero amount:
+
+```bash
+kubectl exec -n food-demo debug-curl -- \
+  curl -i -X POST http://payment-service:8082/payments/charge \
+  -H "Content-Type: application/json" \
+  -H "X-Demo-Key: ${PAYMENT_API_KEY}" \
+  -d '{
+    "order_id": "ord-test-007",
+    "amount": 0,
+    "currency": "NZD"
+  }'
+```
+
+Expected: HTTP `400 BAD REQUEST`.
+
+#### 2.14 Test the service configuration error (optional)
+
+The application returns HTTP `500` if `PAYMENT_API_KEY` is not configured in the Payment Service container. Do not remove the key from your working demo deployment just to run this test. If you reproduce this scenario in a separate test environment, the expected response is:
+
+```json
+{
+  "error": "service_configuration_error",
+  "message": "Payment service is not configured"
+}
+```
+
+Expected: HTTP `500 INTERNAL SERVER ERROR`.
+
+#### 2.15 Check Payment Service logs
+
+```bash
+kubectl logs deployment/payment-service \
+  -n food-demo --tail=100
+```
+
+Look for messages indicating simulated payment approvals and warnings for unauthorized payment requests. The application logs payment IDs, order IDs, amounts, and currencies; do not add API key values to logs.
+
+#### 2.16 Verify Payment Service Kubernetes resources
+
+```bash
+kubectl get deployment payment-service -n food-demo
+
+kubectl get pods -n food-demo \
+  -l app=payment-service
+
+kubectl get service payment-service -n food-demo
+
+kubectl describe deployment payment-service -n food-demo
+```
 
 Expected:
-- Payment request is accepted.
-- Payment status should be APPROVED.
-- Response should indicate that the payment is simulated.
 
-**Note:** This is a simulated payment. No real financial transaction takes place.
+- Deployment has two replicas configured.
+- Payment pods are Running and Ready.
+- Service type is `ClusterIP`.
+- Service port is `8082`.
+- The deployment imports environment variables from `food-demo-secrets`.
+
+**Important:** All payment transactions in this demo are simulated. No real payment gateway is integrated and no money is transferred. Do not expose `/payments/charge` publicly for this demonstration unless you intentionally configure and secure an Ingress route.
 
 ### Test 3: Order Service
 
 Test the Order Service health endpoint:
 
-```bash
+```
 kubectl exec -n food-demo debug-curl -- \
   curl -i http://order-service:8081/health
 ```
 
 Test the readiness endpoint:
 
-```bash
+```
 kubectl exec -n food-demo debug-curl -- \
   curl -i http://order-service:8081/ready
 ```
 
 Expected:
+
 - HTTP 200 response.
 - Order Service should be healthy and ready.
 
@@ -577,7 +817,7 @@ The Order Service communicates with both the Restaurant Service and Payment Serv
 
 Create a new order:
 
-```bash
+```
 kubectl exec -n food-demo debug-curl -- \
   curl -i -X POST http://order-service:8081/orders \
   -H "Content-Type: application/json" \
@@ -591,7 +831,7 @@ kubectl exec -n food-demo debug-curl -- \
 
 Expected response:
 
-```json
+```
 {
   "amount": 25.5,
   "currency": "NZD",
@@ -611,6 +851,7 @@ Expected response:
 ```
 
 Expected:
+
 - HTTP 201 CREATED.
 - Restaurant details returned.
 - Payment approved.
@@ -621,19 +862,20 @@ Expected:
 
 If the Order Service implements GET `/orders`:
 
-```bash
+```
 kubectl exec -n food-demo debug-curl -- \
   curl -i http://order-service:8081/orders
 ```
 
 Expected:
+
 - HTTP 200 response.
 - Total order count returned.
 - Order details returned.
 
 Example:
 
-```json
+```
 {
   "total_orders": 1,
   "orders": [
@@ -656,7 +898,7 @@ Example:
 
 Test the Restaurant Service through the NGINX controller:
 
-```bash
+```
 kubectl exec -n food-demo debug-curl -- \
   curl -i \
   http://ingress-nginx-controller.ingress-nginx.svc.cluster.local/restaurants
@@ -664,7 +906,7 @@ kubectl exec -n food-demo debug-curl -- \
 
 Test the Order Service through NGINX:
 
-```bash
+```
 kubectl exec -n food-demo debug-curl -- \
   curl -i \
   http://ingress-nginx-controller.ingress-nginx.svc.cluster.local/orders
@@ -672,7 +914,7 @@ kubectl exec -n food-demo debug-curl -- \
 
 Test order creation through NGINX:
 
-```bash
+```
 kubectl exec -n food-demo debug-curl -- \
   curl -i -X POST \
   http://ingress-nginx-controller.ingress-nginx.svc.cluster.local/orders \
@@ -686,6 +928,7 @@ kubectl exec -n food-demo debug-curl -- \
 ```
 
 Expected:
+
 - NGINX receives the request.
 - NGINX routes it to the correct Kubernetes Service.
 - The application returns the expected response.
@@ -696,34 +939,34 @@ Kubernetes provides internal DNS-based service discovery.
 
 List the application Services:
 
-```bash
+```
 kubectl get svc -n food-demo
 ```
 
 Resolve the Restaurant Service:
 
-```bash
+```
 kubectl exec -n food-demo debug-curl -- \
   nslookup restaurant-service
 ```
 
 Resolve the Order Service:
 
-```bash
+```
 kubectl exec -n food-demo debug-curl -- \
   nslookup order-service
 ```
 
 Resolve the Payment Service:
 
-```bash
+```
 kubectl exec -n food-demo debug-curl -- \
   nslookup payment-service
 ```
 
 Test connectivity to each Service:
 
-```bash
+```
 kubectl exec -n food-demo debug-curl -- \
   curl -i http://restaurant-service:8080/health
 
@@ -740,14 +983,14 @@ External testing verifies that the application is accessible through the public 
 
 ### Test 7: Retrieve the Ingress Public IP
 
-```bash
+```
 kubectl get svc ingress-nginx-controller \
   -n ingress-nginx
 ```
 
 Set the IP:
 
-```bash
+```
 export INGRESS_IP=$(kubectl get svc ingress-nginx-controller \
   -n ingress-nginx \
   -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
@@ -757,7 +1000,7 @@ echo $INGRESS_IP
 
 For the current demo environment, the previously allocated IP was:
 
-```bash
+```
 export INGRESS_IP=20.193.20.29
 ```
 
@@ -765,17 +1008,18 @@ export INGRESS_IP=20.193.20.29
 
 Test the restaurant listing:
 
-```bash
+```
 curl -i http://${INGRESS_IP}/restaurants
 ```
 
 Test a specific restaurant:
 
-```bash
+```
 curl -i http://${INGRESS_IP}/restaurants/rest-001
 ```
 
 Expected:
+
 - HTTP 200 response.
 - Restaurant details returned.
 
@@ -783,7 +1027,7 @@ Expected:
 
 Create an order through the public Ingress IP:
 
-```bash
+```
 curl -i -X POST http://${INGRESS_IP}/orders \
   -H "Content-Type: application/json" \
   -d '{
@@ -795,6 +1039,7 @@ curl -i -X POST http://${INGRESS_IP}/orders \
 ```
 
 Expected:
+
 - HTTP 201 CREATED.
 - Order confirmation returned.
 - Payment status APPROVED.
@@ -803,11 +1048,12 @@ Expected:
 
 If GET `/orders` is implemented and the Ingress routes `/orders` to the Order Service:
 
-```bash
+```
 curl -i http://${INGRESS_IP}/orders
 ```
 
 Expected:
+
 - HTTP 200 response.
 - Order list returned.
 
@@ -815,27 +1061,27 @@ Expected:
 
 Check the public endpoint:
 
-```bash
+```
 curl -v --connect-timeout 10 \
   http://${INGRESS_IP}/restaurants
 ```
 
 Check the NGINX Service:
 
-```bash
+```
 kubectl get svc ingress-nginx-controller \
   -n ingress-nginx -o wide
 ```
 
 Check the Ingress configuration:
 
-```bash
+```
 kubectl describe ingress food-demo -n food-demo
 ```
 
 Check NGINX controller logs:
 
-```bash
+```
 kubectl logs deployment/ingress-nginx-controller \
   -n ingress-nginx --tail=100
 ```
@@ -852,21 +1098,21 @@ The Payment Service is intended to be accessed internally unless you explicitly 
 
 Increase the Order Service replicas from two to three:
 
-```bash
+```
 kubectl scale deployment order-service \
   --replicas=3 -n food-demo
 ```
 
 Verify:
 
-```bash
+```
 kubectl get pods -n food-demo
 kubectl get deployment order-service -n food-demo
 ```
 
 Restore the original replica count:
 
-```bash
+```
 kubectl scale deployment order-service \
   --replicas=2 -n food-demo
 ```
@@ -875,24 +1121,25 @@ kubectl scale deployment order-service \
 
 List the Order Service pods:
 
-```bash
+```
 kubectl get pods -n food-demo \
   -l app=order-service
 ```
 
 Delete one pod:
 
-```bash
+```
 kubectl delete pod <ORDER-POD-NAME> -n food-demo
 ```
 
 Watch Kubernetes recreate it:
 
-```bash
+```
 kubectl get pods -n food-demo -w
 ```
 
 Expected:
+
 - Kubernetes detects the deleted pod.
 - The Deployment controller creates a replacement pod.
 - The desired replica count is restored.
@@ -903,19 +1150,19 @@ This demonstrates Kubernetes self-healing.
 
 If HPA is configured:
 
-```bash
+```
 kubectl get hpa -n food-demo
 ```
 
 Get HPA details:
 
-```bash
+```
 kubectl describe hpa -n food-demo
 ```
 
 Monitor resource usage:
 
-```bash
+```
 kubectl top pods -n food-demo
 kubectl top nodes
 ```
@@ -928,48 +1175,48 @@ kubectl top nodes
 
 ### Check Restaurant Service Logs
 
-```bash
+```
 kubectl logs deployment/restaurant-service \
   -n food-demo --tail=100
 ```
 
 ### Check Order Service Logs
 
-```bash
+```
 kubectl logs deployment/order-service \
   -n food-demo --tail=100
 ```
 
 ### Check Payment Service Logs
 
-```bash
+```
 kubectl logs deployment/payment-service \
   -n food-demo --tail=100
 ```
 
 ### Check NGINX Ingress Logs
 
-```bash
+```
 kubectl logs deployment/ingress-nginx-controller \
   -n ingress-nginx --tail=100
 ```
 
 ### Describe Application Pods
 
-```bash
+```
 kubectl describe pods -n food-demo
 ```
 
 ### Check Kubernetes Events
 
-```bash
+```
 kubectl get events -n food-demo \
   --sort-by=.metadata.creationTimestamp
 ```
 
 ### Check Deployment Status
 
-```bash
+```
 kubectl rollout status deployment/restaurant-service \
   -n food-demo
 
@@ -982,7 +1229,7 @@ kubectl rollout status deployment/payment-service \
 
 ### Restart a Deployment
 
-```bash
+```
 kubectl rollout restart deployment/restaurant-service \
   -n food-demo
 
@@ -995,7 +1242,7 @@ kubectl rollout restart deployment/payment-service \
 
 ### Roll Back a Deployment
 
-```bash
+```
 kubectl rollout history deployment/order-service \
   -n food-demo
 
@@ -1007,20 +1254,20 @@ kubectl rollout undo deployment/order-service \
 
 ## 13. Useful Kubernetes Commands
 
-| Task | Command |
-|---|---|
-| List nodes | `kubectl get nodes` |
-| List namespaces | `kubectl get ns` |
-| List pods | `kubectl get pods -n food-demo` |
-| List deployments | `kubectl get deployments -n food-demo` |
-| List services | `kubectl get svc -n food-demo` |
-| List Ingress | `kubectl get ingress -n food-demo` |
-| Describe pod | `kubectl describe pod <POD> -n food-demo` |
-| Pod logs | `kubectl logs <POD> -n food-demo` |
-| Follow logs | `kubectl logs -f <POD> -n food-demo` |
-| Execute into pod | `kubectl exec -it <POD> -n food-demo -- /bin/sh` |
-| Watch pods | `kubectl get pods -n food-demo -w` |
-| Check resource usage | `kubectl top pods -n food-demo` |
+| **Task**             | **Command**                                      |
+| -------------------- | ------------------------------------------------ |
+| List nodes           | `kubectl get nodes`                              |
+| List namespaces      | `kubectl get ns`                                 |
+| List pods            | `kubectl get pods -n food-demo`                  |
+| List deployments     | `kubectl get deployments -n food-demo`           |
+| List services        | `kubectl get svc -n food-demo`                   |
+| List Ingress         | `kubectl get ingress -n food-demo`               |
+| Describe pod         | `kubectl describe pod <POD> -n food-demo`        |
+| Pod logs             | `kubectl logs <POD> -n food-demo`                |
+| Follow logs          | `kubectl logs -f <POD> -n food-demo`             |
+| Execute into pod     | `kubectl exec -it <POD> -n food-demo -- /bin/sh` |
+| Watch pods           | `kubectl get pods -n food-demo -w`               |
+| Check resource usage | `kubectl top pods -n food-demo`                  |
 
 ---
 
@@ -1030,11 +1277,12 @@ kubectl rollout undo deployment/order-service \
 
 Check the pod:
 
-```bash
+```
 kubectl describe pod <POD-NAME> -n food-demo
 ```
 
 Check:
+
 - ACR image name and tag.
 - AKS-to-ACR permissions.
 - Image availability in ACR.
@@ -1042,7 +1290,7 @@ Check:
 
 Verify ACR attachment:
 
-```bash
+```
 az aks show \
   --resource-group $RESOURCE_GROUP \
   --name $AKS_NAME \
@@ -1053,19 +1301,19 @@ az aks show \
 
 Check logs:
 
-```bash
+```
 kubectl logs <POD-NAME> -n food-demo
 ```
 
 Check previous container logs:
 
-```bash
+```
 kubectl logs <POD-NAME> -n food-demo --previous
 ```
 
 Describe the pod:
 
-```bash
+```
 kubectl describe pod <POD-NAME> -n food-demo
 ```
 
@@ -1073,13 +1321,13 @@ kubectl describe pod <POD-NAME> -n food-demo
 
 Check Services:
 
-```bash
+```
 kubectl get svc -n food-demo
 ```
 
 Check DNS:
 
-```bash
+```
 kubectl exec -n food-demo debug-curl -- \
   nslookup restaurant-service
 
@@ -1089,7 +1337,7 @@ kubectl exec -n food-demo debug-curl -- \
 
 Test connectivity:
 
-```bash
+```
 kubectl exec -n food-demo debug-curl -- \
   curl -i http://restaurant-service:8080/health
 
@@ -1103,33 +1351,34 @@ Check application configuration and environment variables if connectivity fails.
 
 Check the Ingress resource:
 
-```bash
+```
 kubectl get ingress -n food-demo
 kubectl describe ingress food-demo -n food-demo
 ```
 
 Check the controller:
 
-```bash
+```
 kubectl get pods -n ingress-nginx
 kubectl get svc -n ingress-nginx
 ```
 
 Check the controller logs:
 
-```bash
+```
 kubectl logs deployment/ingress-nginx-controller \
   -n ingress-nginx --tail=100
 ```
 
 Test the NGINX controller internally:
 
-```bash
+```
 kubectl exec -n food-demo debug-curl -- \
   curl -i http://ingress-nginx-controller.ingress-nginx.svc.cluster.local/restaurants
 ```
 
 If internal routing works but external access times out, investigate:
+
 - Azure Load Balancer backend health.
 - Azure network security group rules.
 - NodePort reachability.
@@ -1140,7 +1389,7 @@ If internal routing works but external access times out, investigate:
 
 Check the LoadBalancer IP:
 
-```bash
+```
 kubectl get svc ingress-nginx-controller \
   -n ingress-nginx -o wide
 ```
@@ -1149,7 +1398,7 @@ Check the Azure Load Balancer configuration and health probes in the AKS node re
 
 Check the Service configuration:
 
-```bash
+```
 kubectl get svc ingress-nginx-controller \
   -n ingress-nginx -o yaml
 ```
@@ -1184,13 +1433,13 @@ To remove the demo application:
 
 ### Delete the application resources
 
-```bash
+```
 kubectl delete namespace food-demo
 ```
 
 ### Remove NGINX Ingress
 
-```bash
+```
 helm uninstall ingress-nginx -n ingress-nginx
 kubectl delete namespace ingress-nginx
 ```
@@ -1199,7 +1448,7 @@ kubectl delete namespace ingress-nginx
 
 If you want to remove all Azure resources created for this demo:
 
-```bash
+```
 az aks delete \
   --resource-group $RESOURCE_GROUP \
   --name $AKS_NAME \
@@ -1208,7 +1457,7 @@ az aks delete \
 
 Delete the Container Registry:
 
-```bash
+```
 az acr delete \
   --resource-group $RESOURCE_GROUP \
   --name $ACR_NAME \
@@ -1217,7 +1466,7 @@ az acr delete \
 
 Delete the resource group:
 
-```bash
+```
 az group delete \
   --name $RESOURCE_GROUP \
   --yes \
@@ -1232,22 +1481,22 @@ az group delete \
 
 Suggested sequence for a knowledge-sharing session:
 
-| Step | Demonstration | What it shows |
-|---:|---|---|
-| 1 | Show the application architecture | Microservices design |
-| 2 | Show the Azure AKS cluster | Kubernetes infrastructure |
-| 3 | Show Docker images in ACR | Containerisation and image registry |
-| 4 | Show Deployments and Pods | Kubernetes workload management |
-| 5 | Show Kubernetes Services | Internal service discovery |
-| 6 | Test Restaurant Service | Individual microservice |
-| 7 | Test Payment Service | Simulated payment processing |
-| 8 | Create a customer order | End-to-end microservices integration |
-| 9 | List created orders | Application API functionality |
-| 10 | Test NGINX Ingress internally | Ingress routing |
-| 11 | Test public Ingress IP | External application access |
-| 12 | Scale the Order Service | Kubernetes scaling |
-| 13 | Delete a pod | Kubernetes self-healing |
-| 14 | Show application logs | Monitoring and troubleshooting |
+| **Step** | **Demonstration**                 | **What it shows**                    |
+| -------- | --------------------------------- | ------------------------------------ |
+| 1        | Show the application architecture | Microservices design                 |
+| 2        | Show the Azure AKS cluster        | Kubernetes infrastructure            |
+| 3        | Show Docker images in ACR         | Containerisation and image registry  |
+| 4        | Show Deployments and Pods         | Kubernetes workload management       |
+| 5        | Show Kubernetes Services          | Internal service discovery           |
+| 6        | Test Restaurant Service           | Individual microservice              |
+| 7        | Test Payment Service              | Simulated payment processing         |
+| 8        | Create a customer order           | End-to-end microservices integration |
+| 9        | List created orders               | Application API functionality        |
+| 10       | Test NGINX Ingress internally     | Ingress routing                      |
+| 11       | Test public Ingress IP            | External application access          |
+| 12       | Scale the Order Service           | Kubernetes scaling                   |
+| 13       | Delete a pod                      | Kubernetes self-healing              |
+| 14       | Show application logs             | Monitoring and troubleshooting       |
 
 ### Key Learning Outcomes
 
@@ -1268,25 +1517,25 @@ By completing this demonstration, participants should understand:
 
 Check repository status:
 
-```bash
+```
 git status
 ```
 
 Add the updated README:
 
-```bash
+```
 git add README.md
 ```
 
 Commit changes:
 
-```bash
+```
 git commit -m "Update AKS Food Delivery demo documentation"
 ```
 
 Push to the remote repository:
 
-```bash
+```
 git push
 ```
 
