@@ -1,8 +1,20 @@
 # AKS Food Delivery Demo
 
-A Git-ready, end-to-end Python Flask microservices application for learning Azure Kubernetes Service (AKS). It contains Restaurant, Order and Payment services. The Order service calls Restaurant and Payment over Kubernetes ClusterIP DNS. Payments are simulated only; no real payment provider or money movement is used.
+A Git-ready, end-to-end Python Flask microservices application for learning Azure Kubernetes Service (AKS).
 
-## Repository layout
+The project contains three microservices:
+
+- **Restaurant Service** – provides restaurant information.
+- **Order Service** – creates orders and orchestrates Restaurant and Payment services.
+- **Payment Service** – simulates payment approval.
+
+The Order service communicates with Restaurant and Payment through Kubernetes ClusterIP Services and internal Kubernetes DNS.
+
+> **Important:** Payments are simulated only. No real payment provider is integrated and no money is transferred.
+
+---
+
+## 1. Repository layout
 
 ```text
 aks-food-delivery-demo/
@@ -15,58 +27,137 @@ aks-food-delivery-demo/
 └── README.md
 ```
 
-## Put this project in your Git repository
+## 2. Architecture
 
-Download and extract the ZIP, then run these commands from the extracted project directory. Create an empty repository in GitHub first (do not initialise it with a README, licence or `.gitignore`).
+| Component | Description | Port |
+|---|---|---:|
+| Restaurant Service | Lists restaurants and retrieves restaurant details | 8080 |
+| Order Service | Creates orders and calls Restaurant and Payment | 8081 |
+| Payment Service | Validates demo API key and simulates payment approval | 8082 |
+| NGINX Ingress | Routes external HTTP requests to application services | 80 / 443 |
+
+### Request flow
+
+```text
+                    External Client
+                          |
+                          |
+                Azure Load Balancer
+                          |
+                     Public IP
+                          |
+                          |
+                 NGINX Ingress
+                          |
+              +-----------+-----------+
+              |                       |
+        /restaurants                /orders
+              |                       |
+              v                       v
+      Restaurant Service       Order Service
+              ^                       |
+              |                       |
+              +-----------------------+
+                                      |
+                                      v
+                              Payment Service
+                              (Simulated)
+```
+
+### Kubernetes configuration
+
+- Namespace: `food-demo`
+- Ingress namespace: `ingress-nginx`
+- Ingress controller: NGINX
+- Ingress routes: `/restaurants`, `/orders`, `/payments`
+- Services: ClusterIP
+- Order Service HPA: 2–5 replicas
+- HPA CPU target: 60%
+
+---
+
+## 3. Put this project in your Git repository
+
+Create an empty GitHub repository first. Do not initialise it with a README, licence or `.gitignore`.
+
+From the extracted project directory:
 
 ```bash
 git init
 git add .
 git commit -m "Initial AKS food delivery demo"
 git branch -M main
+
 git remote add origin https://github.com/<YOUR_GITHUB_USERNAME>/aks-food-delivery-demo.git
+
 git push -u origin main
-```
-
-To use it on another machine or in Azure Cloud Shell:
-
-```bash
-git clone https://github.com/<YOUR_GITHUB_USERNAME>/aks-food-delivery-demo.git
-cd aks-food-delivery-demo
 ```
 
 Replace `<YOUR_GITHUB_USERNAME>` with your GitHub username and use your organisation's approved Git authentication method.
 
-## Architecture
+### Clone the project on another machine or in Azure Cloud Shell
 
-- `restaurant-service` — list restaurants and retrieve a restaurant by ID (port 8080)
-- `order-service` — create an order and orchestrate Restaurant + Payment calls (port 8081)
-- `payment-service` — validates a demo API key and returns a simulated approval (port 8082)
-- Kubernetes Ingress — routes `/restaurants`, `/orders` and `/payments` through NGINX
-- HPA — scales Order Service from 2 to 5 replicas at a 60% average CPU target
+```bash
+git clone https://github.com/<YOUR_GITHUB_USERNAME>/aks-food-delivery-demo.git
 
-## Prerequisites
+cd aks-food-delivery-demo
+```
 
-- An Azure subscription with permission to create a resource group, AKS cluster and ACR
-- Azure CLI (`az`), `kubectl`, Helm, and `envsubst` (Azure Cloud Shell includes the common tools)
-- A supported AKS Kubernetes version
+---
 
-## 1. Set variables and create Azure resources
+## 4. Prerequisites
 
-Run in Azure Cloud Shell (Bash). Choose globally unique names containing only lowercase letters and numbers for ACR.
+You need:
+
+- An Azure subscription with permission to create a resource group, AKS cluster and Azure Container Registry (ACR).
+- Azure CLI (`az`).
+- `kubectl`.
+- Helm.
+- `envsubst`.
+- Git.
+- `curl`.
+
+Azure Cloud Shell includes many of these tools.
+
+---
+
+## 5. Set variables and create Azure resources
+
+Run the following commands in Azure Cloud Shell (Bash).
+
+Choose globally unique lowercase names containing only letters and numbers for ACR.
 
 ```bash
 az login
+
 az account set --subscription <SUBSCRIPTION_ID>
 
 export LOCATION=australiaeast
 export RESOURCE_GROUP=rg-aks-food-demo
 export AKS_NAME=aks-food-demo
 export ACR_NAME=<globally-unique-acr-name>
+```
 
-az group create --name "$RESOURCE_GROUP" --location "$LOCATION"
-az acr create --resource-group "$RESOURCE_GROUP" --name "$ACR_NAME" --sku Basic
+Create the resource group:
 
+```bash
+az group create \
+  --name "$RESOURCE_GROUP" \
+  --location "$LOCATION"
+```
+
+Create Azure Container Registry:
+
+```bash
+az acr create \
+  --resource-group "$RESOURCE_GROUP" \
+  --name "$ACR_NAME" \
+  --sku Basic
+```
+
+Create AKS:
+
+```bash
 az aks create \
   --resource-group "$RESOURCE_GROUP" \
   --name "$AKS_NAME" \
@@ -75,143 +166,813 @@ az aks create \
   --node-vm-size Standard_D2s_v5 \
   --generate-ssh-keys \
   --attach-acr "$ACR_NAME"
+```
 
-az aks get-credentials --resource-group "$RESOURCE_GROUP" --name "$AKS_NAME"
+If the selected VM size is unavailable in your region or subscription, choose another AKS-supported size.
+
+Get AKS credentials:
+
+```bash
+az aks get-credentials \
+  --resource-group "$RESOURCE_GROUP" \
+  --name "$AKS_NAME"
+```
+
+Verify the cluster:
+
+```bash
 kubectl get nodes
-export ACR_LOGIN_SERVER="$(az acr show --name "$ACR_NAME" --query loginServer -o tsv)"
+```
+
+Get the ACR login server:
+
+```bash
+export ACR_LOGIN_SERVER="$(az acr show \
+  --name "$ACR_NAME" \
+  --query loginServer -o tsv)"
+
 echo "$ACR_LOGIN_SERVER"
 ```
 
-If the selected VM size is unavailable in your region or subscription, choose an available AKS-supported size. The cluster and ACR incur Azure charges; delete them when finished.
+---
 
-## 2. Build and push the three images
+## 6. Build and push Docker images
 
 From the project root directory:
 
 ```bash
 export ACR_NAME=<same-acr-name>
+
 chmod +x scripts/*.sh
+
 ./scripts/build-and-push.sh
-az acr repository list --name "$ACR_NAME" -o table
 ```
 
-`az acr build` builds in Azure, so a local Docker daemon is not required.
+The script builds and pushes all three application images.
 
-## 3. Install NGINX Ingress Controller
-
-This demo uses the community ingress-nginx Helm chart and the `nginx` IngressClass. This is a learning setup; for production, select an ingress option supported by your AKS version and your organisation's security and support requirements.
+Check the repositories:
 
 ```bash
-helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
-helm repo update
-helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
-  --namespace ingress-nginx --create-namespace \
-  --set controller.replicaCount=2
+az acr repository list \
+  --name "$ACR_NAME" \
+  -o table
+```
 
+Expected repositories:
+
+```text
+food-restaurant
+food-order
+food-payment
+```
+
+The `az acr build` command builds images in Azure, so a local Docker daemon is not required.
+
+---
+
+## 7. Install NGINX Ingress Controller
+
+This demo uses the community ingress-nginx Helm chart and the `nginx` IngressClass.
+
+```bash
+helm repo add ingress-nginx \
+  https://kubernetes.github.io/ingress-nginx
+
+helm repo update
+```
+
+Install the controller:
+
+```bash
+helm upgrade --install ingress-nginx \
+  ingress-nginx/ingress-nginx \
+  --namespace ingress-nginx \
+  --create-namespace \
+  --set controller.replicaCount=2
+```
+
+Wait for the external IP:
+
+```bash
 kubectl get svc -n ingress-nginx -w
 ```
 
-Wait for the `ingress-nginx-controller` Service to receive an external IP. Press Ctrl+C after it appears.
+Wait until `ingress-nginx-controller` receives an external IP. Press `Ctrl+C` after it appears.
 
-## 4. Configure the demo secret
+Check the controller:
 
-Edit `kubernetes/secrets.yaml` and replace `replace-this-demo-key` with a non-production demo value. This file is committed as an example, so do not put real credentials in Git. For production, use Azure Key Vault and the Secrets Store CSI Driver / workload identity integration.
+```bash
+kubectl get pods -n ingress-nginx
+kubectl get svc -n ingress-nginx
+kubectl get ingressclass
+```
 
-## 5. Deploy the application
+> This is a learning setup. For production, select an ingress option supported by your AKS version and your organisation's security and support requirements.
+
+---
+
+## 8. Configure the demo secret
+
+Edit:
+
+```text
+kubernetes/secrets.yaml
+```
+
+Replace:
+
+```text
+replace-this-demo-key
+```
+
+with a non-production demo value.
+
+Do not commit real credentials to Git.
+
+The `PAYMENT_API_KEY` value must be identical in the Order and Payment service environments. Both deployments should read the same Kubernetes Secret.
+
+For production, use Azure Key Vault with the Secrets Store CSI Driver and an appropriate workload identity integration.
+
+---
+
+## 9. Deploy the application
 
 From the project root:
 
 ```bash
-export ACR_LOGIN_SERVER="$(az acr show --name "$ACR_NAME" --query loginServer -o tsv)"
+export ACR_LOGIN_SERVER="$(az acr show \
+  --name "$ACR_NAME" \
+  --query loginServer -o tsv)"
+```
+
+Deploy:
+
+```bash
 ./scripts/deploy.sh
 ```
 
-Or apply the manifests manually after exporting `ACR_LOGIN_SERVER`; the deployment script uses `envsubst` to substitute the image registry in the three Deployment manifests.
+Alternatively, apply the Kubernetes manifests manually after exporting `ACR_LOGIN_SERVER`. The deployment script uses `envsubst` to substitute the image registry in the Deployment manifests.
 
-## 6. Test the application
+Verify the deployments:
 
-Get the Ingress IP:
+```bash
+kubectl get all -n food-demo
+```
+
+Check pods:
+
+```bash
+kubectl get pods -n food-demo -o wide
+```
+
+Check Ingress:
 
 ```bash
 kubectl get ingress -n food-demo
-kubectl get svc ingress-nginx-controller -n ingress-nginx
-export INGRESS_IP=$(kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+```
+
+Check HPA:
+
+```bash
+kubectl get hpa -n food-demo
+```
+
+---
+
+# 10. Application testing
+
+This section covers both internal and external testing.
+
+## 10.1 Internal testing from inside Kubernetes
+
+First, create a temporary curl testing pod if you do not already have one.
+
+```bash
+kubectl run debug-curl \
+  --image=curlimages/curl:latest \
+  --namespace food-demo \
+  --restart=Never \
+  --command -- sleep 3600
+```
+
+Wait until it is running:
+
+```bash
+kubectl get pod debug-curl -n food-demo -w
+```
+
+If you already have a running `debug-curl` or `curl-test` pod, you can use that instead.
+
+### Test 1: Restaurant Service
+
+List restaurants:
+
+```bash
+kubectl exec -n food-demo debug-curl -- \
+  curl -i http://restaurant-service:8080/restaurants
+```
+
+Expected:
+
+```text
+HTTP/1.1 200 OK
+```
+
+Retrieve a specific restaurant:
+
+```bash
+kubectl exec -n food-demo debug-curl -- \
+  curl -i http://restaurant-service:8080/restaurants/rest-001
+```
+
+Expected:
+
+```text
+HTTP/1.1 200 OK
+```
+
+### Test 2: Payment Service
+
+Health check:
+
+```bash
+kubectl exec -n food-demo debug-curl -- \
+  curl -i http://payment-service:8082/health
+```
+
+Readiness check:
+
+```bash
+kubectl exec -n food-demo debug-curl -- \
+  curl -i http://payment-service:8082/ready
+```
+
+Expected: HTTP 200 responses.
+
+### Test 3: Order Service
+
+Health check:
+
+```bash
+kubectl exec -n food-demo debug-curl -- \
+  curl -i http://order-service:8081/health
+```
+
+Readiness check:
+
+```bash
+kubectl exec -n food-demo debug-curl -- \
+  curl -i http://order-service:8081/ready
+```
+
+### Test 4: End-to-end order creation
+
+This is the most important internal integration test.
+
+```bash
+kubectl exec -n food-demo debug-curl -- \
+  curl -i -X POST http://order-service:8081/orders \
+  -H "Content-Type: application/json" \
+  -d '{
+    "restaurant_id": "rest-001",
+    "item": "Chicken Burger",
+    "amount": 25.50,
+    "customer": "AKS Demo Customer"
+  }'
+```
+
+Expected:
+
+```text
+HTTP/1.1 201 CREATED
+```
+
+Example response:
+
+```json
+{
+  "amount": 25.5,
+  "currency": "NZD",
+  "customer": "AKS Demo Customer",
+  "item": "Chicken Burger",
+  "order_id": "ord-example",
+  "payment": {
+    "amount": 25.5,
+    "currency": "NZD",
+    "order_id": "ord-example",
+    "payment_id": "pay-example",
+    "simulated": true,
+    "status": "APPROVED"
+  },
+  "restaurant": "Kiwi Kitchen",
+  "status": "CONFIRMED"
+}
+```
+
+The IDs will be generated dynamically and will differ between requests.
+
+This test confirms:
+
+1. The Order Service receives the request.
+2. The Order Service calls Restaurant Service.
+3. Restaurant Service returns restaurant information.
+4. The Order Service calls Payment Service.
+5. Payment Service validates the demo API key.
+6. Payment Service returns a simulated approval.
+7. The Order Service returns a confirmed order.
+
+### Test 5: NGINX Ingress internally
+
+Test the Restaurant route through NGINX:
+
+```bash
+kubectl exec -n food-demo debug-curl -- \
+  curl -i \
+  http://ingress-nginx-controller.ingress-nginx.svc.cluster.local/restaurants
+```
+
+Test a specific restaurant:
+
+```bash
+kubectl exec -n food-demo debug-curl -- \
+  curl -i \
+  http://ingress-nginx-controller.ingress-nginx.svc.cluster.local/restaurants/rest-001
+```
+
+Test order creation through NGINX:
+
+```bash
+kubectl exec -n food-demo debug-curl -- \
+  curl -i -X POST \
+  http://ingress-nginx-controller.ingress-nginx.svc.cluster.local/orders \
+  -H "Content-Type: application/json" \
+  -d '{
+    "restaurant_id": "rest-001",
+    "item": "Fish and Chips",
+    "amount": 24.50,
+    "customer": "Internal Ingress Test"
+  }'
+```
+
+Expected: HTTP 201 CREATED.
+
+These tests confirm that internal Kubernetes DNS, ClusterIP Services and NGINX path routing are working.
+
+---
+
+## 10.2 External testing through Azure public IP
+
+Get the public IP:
+
+```bash
+kubectl get svc ingress-nginx-controller \
+  -n ingress-nginx
+```
+
+Export the public IP automatically:
+
+```bash
+export INGRESS_IP="$(kubectl get svc \
+  ingress-nginx-controller \
+  -n ingress-nginx \
+  -o jsonpath='{.status.loadBalancer.ingress[0].ip}')"
+
 echo "$INGRESS_IP"
 ```
 
-If DNS is not configured, send the Host header (the Ingress rule has no hostname):
+### Test 1: List restaurants
 
 ```bash
-curl "http://${INGRESS_IP}/restaurants"
-curl "http://${INGRESS_IP}/restaurants/rest-001"
-
-curl -i -X POST "http://${INGRESS_IP}/orders" \
-  -H 'Content-Type: application/json' \
-  -d '{"restaurant_id":"rest-001","item":"Fish and chips","amount":24.50,"customer":"AKL Demo User"}'
+curl -i "http://${INGRESS_IP}/restaurants"
 ```
 
-A successful order returns HTTP 201 with `status: CONFIRMED` and a simulated payment result. A nonexistent restaurant ID should return HTTP 404.
+Expected: HTTP 200 OK.
 
-Run the bundled smoke test:
+### Test 2: Retrieve a restaurant
 
 ```bash
-export INGRESS_IP="$(kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.status.loadBalancer.ingress[0].ip}')"
+curl -i "http://${INGRESS_IP}/restaurants/rest-001"
+```
+
+Expected: HTTP 200 OK.
+
+### Test 3: Create an order
+
+```bash
+curl -i -X POST "http://${INGRESS_IP}/orders" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "restaurant_id": "rest-001",
+    "item": "Fish and Chips",
+    "amount": 24.50,
+    "customer": "External Demo Customer"
+  }'
+```
+
+Expected: HTTP 201 CREATED.
+
+The response should contain:
+
+- An order ID.
+- Restaurant name.
+- Order status `CONFIRMED`.
+- Payment status `APPROVED`.
+- `"simulated": true`.
+
+### Test 4: Test from a Windows laptop
+
+Open PowerShell or Windows Terminal:
+
+```powershell
+curl.exe -i --connect-timeout 10 http://<INGRESS_IP>/restaurants
+```
+
+Replace `<INGRESS_IP>` with the public IP displayed by Kubernetes.
+
+Test order creation:
+
+```powershell
+curl.exe -i -X POST http://<INGRESS_IP>/orders `
+  -H "Content-Type: application/json" `
+  -d '{\"restaurant_id\":\"rest-001\",\"item\":\"Fish and Chips\",\"amount\":24.50,\"customer\":\"Windows Demo User\"}'
+```
+
+This verifies access from outside Azure Cloud Shell.
+
+> If the public IP connection times out, check Azure Load Balancer health probes, backend pools, NSG rules, subnet security and routing. A working internal application does not guarantee that the public network path is open.
+
+---
+
+## 10.3 External connectivity troubleshooting
+
+If internal tests pass but public requests time out, investigate the Azure Load Balancer and network configuration.
+
+Check the NGINX Service:
+
+```bash
+kubectl describe svc ingress-nginx-controller \
+  -n ingress-nginx
+```
+
+Check the Load Balancer rules:
+
+```bash
+az network lb rule list \
+  --resource-group "$NODE_RG" \
+  --lb-name "$LB_NAME" \
+  -o table
+```
+
+Inspect the HTTP rule:
+
+```bash
+az network lb rule list \
+  --resource-group "$NODE_RG" \
+  --lb-name "$LB_NAME" \
+  --query "[?frontendPort==\`80\`]" \
+  -o json
+```
+
+Check health probes:
+
+```bash
+az network lb probe list \
+  --resource-group "$NODE_RG" \
+  --lb-name "$LB_NAME" \
+  -o json
+```
+
+Check backend pools:
+
+```bash
+az network lb address-pool list \
+  --resource-group "$NODE_RG" \
+  --lb-name "$LB_NAME" \
+  -o json
+```
+
+Check the AKS networking configuration:
+
+```bash
+az aks show \
+  --resource-group "$AKS_RG" \
+  --name "$AKS_NAME" \
+  --query networkProfile \
+  -o json
+```
+
+### Test the NGINX NodePort
+
+Get the node IP addresses:
+
+```bash
+kubectl get nodes -o wide
+```
+
+Use an AKS node's `INTERNAL-IP`:
+
+```bash
+kubectl exec -n food-demo debug-curl -- \
+  curl -i --connect-timeout 5 http://<NODE-IP>:31522/
+```
+
+Test the restaurant route:
+
+```bash
+kubectl exec -n food-demo debug-curl -- \
+  curl -i --connect-timeout 5 http://<NODE-IP>:31522/restaurants
+```
+
+The NodePort shown above is an example for this deployment. Check the actual value with:
+
+```bash
+kubectl get svc ingress-nginx-controller \
+  -n ingress-nginx
+```
+
+The Load Balancer health probe should be inspected carefully. Verify that its protocol, port and request path are compatible with the NGINX controller and the Service's traffic policy.
+
+### Check NGINX controller logs
+
+```bash
+kubectl logs \
+  -n ingress-nginx \
+  deployment/ingress-nginx-controller \
+  --tail=100
+```
+
+Follow logs in real time:
+
+```bash
+kubectl logs \
+  -n ingress-nginx \
+  deployment/ingress-nginx-controller \
+  -f
+```
+
+In another terminal, send a public request:
+
+```bash
+curl -v --connect-timeout 10 \
+  http://<INGRESS_IP>/restaurants
+```
+
+If no request appears in the NGINX logs, investigate the network path before the controller.
+
+Do not open all inbound ports or change NSG rules indiscriminately. Use your organisation's approved network security rules.
+
+---
+
+## 10.4 Bundled smoke test
+
+From the project root:
+
+```bash
+export INGRESS_IP="$(kubectl get svc \
+  ingress-nginx-controller \
+  -n ingress-nginx \
+  -o jsonpath='{.status.loadBalancer.ingress[0].ip}')"
+
 ./scripts/smoke-test.sh
 ```
 
-## 7. Useful demo commands
+The smoke test checks the application through the configured Ingress IP. Review the script to confirm which endpoints it tests.
+
+---
+
+# 11. Useful Kubernetes demo commands
+
+### View application resources
 
 ```bash
-# View all application resources
 kubectl get all,ingress,hpa -n food-demo
-
-# Watch pods while scaling or deleting one
-kubectl get pods -n food-demo -w
-
-# Demonstrate self-healing (Deployment recreates the deleted pod)
-kubectl delete pod -n food-demo -l app=restaurant-service --wait=false
-kubectl get pods -n food-demo -w
-
-# Demonstrate manual scaling
-kubectl scale deployment/order-service -n food-demo --replicas=4
-kubectl get deployment/order-service -n food-demo
-
-# Inspect autoscaling (CPU metrics may take a minute to appear)
-kubectl get hpa -n food-demo -w
-kubectl top pods -n food-demo
-
-# Logs and rollout status
-kubectl logs -n food-demo deployment/order-service --tail=100
-kubectl rollout status deployment/order-service -n food-demo
-
-# Demonstrate a rolling update after building/pushing a new image tag
-# Update the image tag in kubernetes/order.yaml, redeploy, then:
-kubectl rollout history deployment/order-service -n food-demo
-kubectl rollout undo deployment/order-service -n food-demo
 ```
 
-The HPA controls the replica count, so a manual `kubectl scale` can be reconciled by the HPA. For a clean scaling demonstration, temporarily remove the HPA (`kubectl delete hpa order-service -n food-demo`) before manually scaling, then reapply it (`kubectl apply -f kubernetes/hpa.yaml`). CPU load testing is not included by default; generate controlled load only in a non-production demo cluster.
-
-## 8. Troubleshooting
-
-- `ImagePullBackOff`: verify image names/tags in ACR, `ACR_LOGIN_SERVER`, and that AKS has pull permission (`az aks check-acr -g "$RESOURCE_GROUP" -n "$AKS_NAME" --acr "$ACR_LOGIN_SERVER"`).
-- Ingress has no address: check `kubectl get pods,svc -n ingress-nginx` and Azure load balancer provisioning events.
-- HPA shows `<unknown>`: check `kubectl top nodes` and `kubectl top pods -n food-demo`; wait for metrics collection and confirm resource requests are set.
-- Order returns `502`: inspect `kubectl logs deployment/order-service -n food-demo` and verify the restaurant/payment Services and endpoints.
-- Secret mismatch: the `PAYMENT_API_KEY` value must be identical in the Order and Payment environment; both deployments read the same Kubernetes Secret.
-
-## 9. Clean up Azure resources
+### Watch pods
 
 ```bash
-az group delete --name "$RESOURCE_GROUP" --yes --no-wait
+kubectl get pods -n food-demo -w
 ```
 
-This removes the AKS cluster, ACR and other resources in that resource group. Confirm the resource group contains no resources you need before deleting it.
+### Demonstrate self-healing
 
-## Security and scope notes
+Delete a Restaurant Service pod:
 
-- This is an intermediate learning/demo project, not a production reference architecture.
-- The payment service simulates approval and never charges a card.
-- The example Secret is for a sandbox only. Kubernetes Secrets are base64-encoded at rest unless encryption at rest is configured; use Key Vault for real credentials.
-- Ingress is HTTP-only in this starter. Configure TLS, DNS, network policies, managed identities/workload identity, image scanning, and centralised monitoring before production use.
-- The services use in-memory static restaurant data and do not persist orders.
+```bash
+kubectl delete pod \
+  -n food-demo \
+  -l app=restaurant-service \
+  --wait=false
+```
+
+Watch Kubernetes recreate the pod:
+
+```bash
+kubectl get pods -n food-demo -w
+```
+
+### Demonstrate manual scaling
+
+For a clean manual scaling demonstration, temporarily remove the HPA:
+
+```bash
+kubectl delete hpa order-service -n food-demo
+```
+
+Scale Order Service:
+
+```bash
+kubectl scale deployment/order-service \
+  -n food-demo \
+  --replicas=4
+```
+
+Verify:
+
+```bash
+kubectl get deployment order-service -n food-demo
+kubectl get pods -n food-demo
+```
+
+Reapply the HPA:
+
+```bash
+kubectl apply -f kubernetes/hpa.yaml
+```
+
+The HPA controls the replica count, so manual scaling can otherwise be reconciled by the HPA.
+
+### Demonstrate autoscaling
+
+```bash
+kubectl get hpa -n food-demo -w
+```
+
+Check CPU usage:
+
+```bash
+kubectl top nodes
+kubectl top pods -n food-demo
+```
+
+CPU metrics may take a minute to appear. CPU load testing is not included by default. Generate controlled load only in a non-production demo cluster.
+
+### Inspect logs
+
+```bash
+kubectl logs \
+  -n food-demo \
+  deployment/order-service \
+  --tail=100
+```
+
+```bash
+kubectl logs \
+  -n food-demo \
+  deployment/restaurant-service \
+  --tail=100
+```
+
+```bash
+kubectl logs \
+  -n food-demo \
+  deployment/payment-service \
+  --tail=100
+```
+
+### Check rollout status
+
+```bash
+kubectl rollout status deployment/order-service \
+  -n food-demo
+```
+
+### Demonstrate rolling updates and rollback
+
+After building and pushing a new image tag and updating the Deployment:
+
+```bash
+kubectl rollout history deployment/order-service \
+  -n food-demo
+```
+
+Rollback:
+
+```bash
+kubectl rollout undo deployment/order-service \
+  -n food-demo
+```
+
+---
+
+# 12. Troubleshooting
+
+| Problem | What to check |
+|---|---|
+| ImagePullBackOff | Image names, image tags, ACR login server and AKS pull permission |
+| Ingress has no address | NGINX controller pods, Service events and Azure Load Balancer provisioning |
+| External IP connection timeout | Azure Load Balancer health probes, NSG rules, backend pool and routing |
+| HPA shows `<unknown>` | Metrics Server, CPU metrics and resource requests |
+| Order returns 502 | Order logs, Restaurant and Payment Services and endpoints |
+| Payment returns unauthorized | Matching `PAYMENT_API_KEY` in both service environments |
+| Internal DNS failure | Kubernetes Service names, namespace and CoreDNS |
+| Pod CrashLoopBackOff | Pod logs, events, configuration and Secret references |
+
+### Check ACR access
+
+```bash
+az aks check-acr \
+  --resource-group "$RESOURCE_GROUP" \
+  --name "$AKS_NAME" \
+  --acr "$ACR_LOGIN_SERVER"
+```
+
+### Check endpoints
+
+```bash
+kubectl get endpoints -n food-demo
+```
+
+### Describe a failing pod
+
+```bash
+kubectl describe pod <POD_NAME> -n food-demo
+```
+
+### Check recent events
+
+```bash
+kubectl get events \
+  -n food-demo \
+  --sort-by=.metadata.creationTimestamp
+```
+
+---
+
+# 13. Security and scope notes
+
+This is an intermediate learning/demo project, not a production reference architecture.
+
+- The Payment Service simulates approval and never charges a card.
+- The example Secret is intended for sandbox use only.
+- Kubernetes Secrets are not automatically equivalent to a full secrets-management solution.
+- Use Azure Key Vault for production credentials.
+- The example Ingress is HTTP-only. Configure TLS and DNS for production.
+- Consider Kubernetes Network Policies, workload identity, managed identities, image scanning and centralised monitoring before production use.
+- Follow your organisation's approved security and networking standards.
+
+---
+
+# 14. Clean up Azure resources
+
+Azure resources incur charges while running.
+
+When the demonstration is finished, confirm that the resource group contains no resources you need.
+
+Delete the resource group:
+
+```bash
+az group delete \
+  --name "$RESOURCE_GROUP" \
+  --yes \
+  --no-wait
+```
+
+This removes the AKS cluster, ACR and other resources contained in that resource group.
+
+---
+
+# 15. Demo checklist for knowledge-sharing sessions
+
+Use this checklist during your Kubernetes demonstration.
+
+- [ ] Explain the three microservices and their responsibilities.
+- [ ] Show the Docker images in ACR.
+- [ ] Show the Kubernetes Deployments and Pods.
+- [ ] Show ClusterIP Services and internal DNS.
+- [ ] Test Restaurant Service internally.
+- [ ] Test Payment Service internally.
+- [ ] Create an order through Order Service.
+- [ ] Demonstrate Order → Restaurant → Payment communication.
+- [ ] Show NGINX Ingress routing.
+- [ ] Test application access through the public IP.
+- [ ] Demonstrate Kubernetes self-healing by deleting a pod.
+- [ ] Demonstrate manual scaling.
+- [ ] Demonstrate HPA.
+- [ ] Show application logs.
+- [ ] Explain Azure Load Balancer and external traffic flow.
+- [ ] Explain security considerations and cleanup.
+
+## Learning outcomes
+
+By completing this project, participants should understand:
+
+1. How to containerise Python Flask applications using Docker.
+2. How to build and push container images to Azure Container Registry.
+3. How to deploy microservices to AKS.
+4. How Kubernetes Deployments, Pods and Services work.
+5. How ClusterIP and Kubernetes DNS enable internal service communication.
+6. How Ingress exposes HTTP application routes.
+7. How Azure Load Balancer connects external traffic to AKS.
+8. How Kubernetes performs self-healing and scaling.
+9. How to troubleshoot common AKS application and networking problems.
